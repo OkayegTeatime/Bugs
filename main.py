@@ -1,9 +1,8 @@
-from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 
-image_path = r"C:\Users\Yusif\Desktop\Bug Problem.JPG"
+image_path = "\\Bug Problem.jpg"
 img = cv2.imread(image_path)
 image = cv2.flip(img, 0)
 start_point = [75, 223]
