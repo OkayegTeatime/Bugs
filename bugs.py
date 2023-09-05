@@ -5,7 +5,7 @@ from matplotlib.animation import FuncAnimation
 import numpy as np
 from process_image import image, find_contours, find_vertices
 
-
+print('bing')
 def find_line_equation(point1, point2):
     # Calculate the slope (m) of the line
     buffer = 5
