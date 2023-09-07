@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import numpy as np
 
-from process_image import image, find_contours, find_vertices
+# from process_image import find_contours, find_vertices
 
 
 def find_line_equation(point1, point2):
@@ -41,22 +41,24 @@ def farthest_point(coord1, coord2, target_coord):
 
 
 class Bug:
-    def __init__(self, start, goal, bug_type, steps=500, step_distance=1):
+    def __init__(self, start, goal, edges, bug_type, steps=500, step_distance=1):
         self.bug_type = bug_type
         self.x = start[0]
         self.y = start[1]
+        self.start = start
         self.goal = goal
         self.heading = 0
         self.position_history = [[self.x, self.y]]
         self.mode = 'goal'
         self.lockout_max = 5
         self.lockout = 0
-        self.m_line = find_line_equation(start_point, goal_point)
+        self.m_line = find_line_equation(start, goal)
         self.entry_points = []
         self.m_line_intercepts = []
         self.exit_on_m_line = True if bug_type == 2 else False
         self.step_distance = step_distance
         self.steps = steps
+        self.edges = edges
 
     def run(self):
         print(f"Bug {self.bug_type} Starting Location:", self.get_position())
@@ -64,12 +66,12 @@ class Bug:
         self.turn_to_goal()
         for _ in range(0, self.steps):
             self.move_forward(self.step_distance)
-            self.detect_edges(edges)
+            self.detect_edges(self.edges)
             self.detect_m_line()
             if self.bug_type == 1: self.detect_entry()
-            if self._detect_point(goal_point, threshold=0.003):
+            if self._detect_point(self.goal, threshold=0.003):
                 print('GOAL REACHED')
-                self.spiral(goal_point)
+                self.spiral(self.goal)
                 break
         runtime = round((time.time() - start_time), 2)
         print(f'\nBug {self.bug_type} sim completed with {self.steps} time steps in {runtime} sec.')
@@ -129,7 +131,7 @@ class Bug:
         # print(np.rad2deg(self.heading))
 
     def detect_entry(self):
-        if self.lockout < -2:
+        if self.lockout < -5:
             if self.mode == 'circ':
                 is_complete = self._detect_point(self.entry_points[-1])
                 if is_complete:
@@ -140,11 +142,11 @@ class Bug:
     def move_along_path(self, func):
         pass
 
-    def _detect_point(self, point, threshold=0.02):
+    def _detect_point(self, point, threshold=0.01):
         x, y = self.get_position()
         target_x, target_y = point
         distance = math.sqrt((x - target_x) ** 2 + (y - target_y) ** 2)
-        norm = math.sqrt(x ** 2 + y ** 2)
+        norm = math.sqrt((self.start[0] - self.goal[0]) ** 2 + (self.start[1] - self.goal[1]) ** 2)
         return distance / norm < threshold
 
     # def go_to_m_line(self):
@@ -159,7 +161,7 @@ class Bug:
 
     def _find_direction_to_turn(self, edge, m_line=False):
         if m_line:
-            farthest_vertex = goal_point
+            farthest_vertex = self.goal
         else:
             farthest_vertex = farthest_point(edge['points'][0], edge['points'][1], [self.x, self.y])
         print(farthest_vertex)
@@ -184,49 +186,48 @@ class Bug:
 
 
 class Anim:
-    def __init__(self, data, title='Bug Motion'):
+    def __init__(self, data, start, goal, edges, title='Bug Motion'):
         self.title = title
         self.x = []
         self.y = []
         self.data = data
         self.fig, self.ax = plt.subplots()
+        self.counter = count(0, 10)
+        self.start = start
+        self.goal = goal
+        self.edges = edges
 
     def update_plot(self, frame):
-        ind = next(counter)
-        if ind > len(self.data) - 1:
-            anim.event_source.stop()
-            print('\nEnd of animation. Thanks for watching.')
-            return
-        self.x.append(self.data[ind][0])
-        self.y.append(self.data[ind][1])
-        plt.cla()
-        self.ax.plot(self.x, self.y)
-        self.ax.plot(self.x[-1], self.y[-1], marker='o')
-        self.ax.plot([start_point[0], goal_point[0]], [start_point[1], goal_point[1]], marker='o')
-        for edge in edges:
-            self.ax.plot([point[0] for point in edge['points']], [point[1] for point in edge['points']], color='red')
-
-        plt.title(self.title)
-        plt.xlim([0, 780])
-        plt.ylim([0, 400])
+        ind = next(self.counter)
+        if 1 < ind < len(self.data) - 1:
+            self.x = [point[0] for point in self.data[0:ind]]
+            self.y = [point[1] for point in self.data[0:ind]]
+            plt.cla()
+            self.ax.plot(self.x, self.y)
+            self.ax.plot(self.x[-1], self.y[-1], marker='o')
+            self.ax.plot([self.start[0], self.goal[0]], [self.start[1], self.goal[1]], marker='o')
+            for edge in self.edges:
+                self.ax.plot([point[0] for point in edge['points']], [point[1] for point in edge['points']], color='red')
+            plt.title(self.title)
+            plt.xlim([0, 780])
+            plt.ylim([0, 400])
 
 
 # Example usage:
 if __name__ == "__main__":
-    start_point = [75, 224]
-    goal_point = [682, 223]
-    edges = []
-    contours = find_contours(image)
-    for contour in contours:
-        vertices = find_vertices(contour)
-        for ind in range(len(vertices) - 1):
-            edges.append(find_line_equation(vertices[ind], vertices[ind + 1]))
-
-    counter = count(0, 1)
-    bug1 = Bug(start_point, goal_point, 1, steps=2000, step_distance=2)
-    bug1.run()
+    pass
+    # start_point = [75, 224]
+    # goal_point = [682, 223]
+    # edges = []
+    # contours = find_contours(image)
+    # for contour in contours:
+    #     vertices = find_vertices(contour)
+    #     for ind in range(len(vertices) - 1):
+    #         edges.append(find_line_equation(vertices[ind], vertices[ind + 1]))
+    # bug1 = Bug(start_point, goal_point, 1, steps=2000, step_distance=2)
+    # bug1.run()
     # bug2 = Bug(start_point, goal_point, 2, steps=1500, step_distance=1)
     # bug2.run()
-    animation = Anim(bug1.position_history[0::3], title=f'Bug Motion')
-    anim = FuncAnimation(animation.fig, animation.update_plot, blit=False, interval=10, save_count=1000)
-    plt.show()
+    # animation = Anim(bug1.position_history[0::3], title=f'Bug Motion')
+    # anim = FuncAnimation(animation.fig, animation.update_plot, blit=False, interval=10, save_count=1000)
+    # plt.show()

@@ -1,10 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
+from bugs import find_line_equation
 
-image_path = r"C:\Users\Yusif\Desktop\Bug Problem.JPG"
+image_path = "Bug Problem.jpg"
 img = cv2.imread(image_path)
-image = cv2.flip(img, 0)
+IMAGE = cv2.flip(img, 0)
 start_point = [75, 223]
 goal_point = [682, 221]
 
@@ -26,12 +27,45 @@ def find_vertices(contour):
     return np.vstack([vertices, vertices[0]])
 
 
-if __name__ == "__main__":
-    plt.figure()
-    plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), origin='upper')
-    contours_ = find_contours(image)
+def find_edges(image):
+    edges = []
+    contours = find_contours(image)
+    for contour in contours:
+        vertices = find_vertices(contour)
+        for ind in range(len(vertices) - 1):
+            edges.append(find_line_equation(vertices[ind], vertices[ind + 1]))
+    return edges
 
-    # Plot the polygon by connecting its vertices
+
+if __name__ == "__main__":
+    gray = cv2.cvtColor(IMAGE, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    edged = cv2.Canny(blurred, 50, 150)
+
+    # plt.figure()
+    # plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), origin='upper')
+    contours_ = find_contours(IMAGE)
+    plt.figure()
+    plt.subplot(221)
+    plt.imshow(gray, cmap='gray')
+    plt.title('Greyscale Image')
+    plt.gca().invert_yaxis()
+
+    plt.subplot(222)
+    plt.imshow(blurred, cmap='gray')
+    plt.title('Blurred Image')
+    plt.gca().invert_yaxis()
+
+    plt.subplot(223)
+    plt.imshow(edged, cmap='gray')
+    plt.title('Edged Image')
+    plt.gca().invert_yaxis()
+
+    # Create a new subplot for the polygon
+    plt.subplot(224)
+    plt.imshow(cv2.cvtColor(IMAGE, cv2.COLOR_BGR2RGB))
+    plt.title('Detected Polygons')
+
     for contour_ in contours_:
         vertices_ = find_vertices(contour_)
         polygon_x, polygon_y = zip(*vertices_)
