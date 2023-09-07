@@ -12,8 +12,8 @@ goal_point = [682, 221]
 
 if __name__ == '__main__':
     edges = find_edges(image)
-    # bug = Bug(start_point, goal_point, edges, 1, steps=4000, step_distance=1)
-    bug = Bug(start_point, goal_point, edges, 2, steps=1500, step_distance=1)
+    bug = Bug(start_point, goal_point, edges, 1, steps=4000, step_distance=1)
+    # bug = Bug(start_point, goal_point, edges, 2, steps=1500, step_distance=1)
     bug.run()
     animation = Anim(bug.position_history, start_point, goal_point, edges, title=f'Bug Motion')
     anim = FuncAnimation(animation.fig, animation.update_plot, blit=False, interval=10, save_count=1000)

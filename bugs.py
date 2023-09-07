@@ -2,10 +2,6 @@ import math
 import time
 from itertools import count
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
-import numpy as np
-
-# from process_image import find_contours, find_vertices
 
 
 def find_line_equation(point1, point2):
@@ -27,7 +23,6 @@ def find_line_equation(point1, point2):
             'limit': {'x': [x_limit[0] - buffer, x_limit[1] + buffer],
                       'y': [y_limit[0] - buffer, y_limit[1] + buffer]},
             'points': [point1, point2]}
-    # print(f'\nEquation of line segment: {a}x + {b}y = {c} \nfor x in {x_limit} and y in {y_limit}')
     return edge
 
 
@@ -54,11 +49,13 @@ class Bug:
         self.lockout = 0
         self.m_line = find_line_equation(start, goal)
         self.entry_points = []
+        self.entry_point_indexes = []
         self.m_line_intercepts = []
-        self.exit_on_m_line = True if bug_type == 2 else False
         self.step_distance = step_distance
         self.steps = steps
         self.edges = edges
+        self.exit_point = None
+        self.time_step = 0
 
     def run(self):
         print(f"Bug {self.bug_type} Starting Location:", self.get_position())
@@ -67,22 +64,23 @@ class Bug:
         for _ in range(0, self.steps):
             self.move_forward(self.step_distance)
             self.detect_edges(self.edges)
-            self.detect_m_line()
-            if self.bug_type == 1: self.detect_entry()
+            if self.bug_type == 1: self.detect_entry_exit_point()
+            if self.bug_type == 2: self.detect_m_line()
             if self._detect_point(self.goal, threshold=0.003):
                 print('GOAL REACHED')
+                runtime = round((time.time() - start_time), 2)
+                print(f'\nBug {self.bug_type} sim completed with {len(self.position_history)} steps in {runtime} sec.')
+                print('Entry Points: ', [[int(x) for x in point] for point in self.entry_points])
+                print('M-Line Intercepts: ', [[int(x) for x in point] for point in self.m_line_intercepts])
                 self.spiral(self.goal)
                 break
-        runtime = round((time.time() - start_time), 2)
-        print(f'\nBug {self.bug_type} sim completed with {self.steps} time steps in {runtime} sec.')
-        print('Entry Points: ', [[int(x) for x in point] for point in self.entry_points])
-        print('M-Line Intercepts: ', [[int(x) for x in point] for point in self.m_line_intercepts])
 
     def move_forward(self, distance):
         self.x += distance * math.cos(self.heading)
         self.y += distance * math.sin(self.heading)
         self.position_history.append(self.get_position())
         self.lockout -= 1
+        self.time_step += 1
 
     def turn(self, angle):
         self.heading += angle
@@ -102,13 +100,12 @@ class Bug:
             for edge in edges:
                 if self._find_collision(edge):
                     if self.mode == 'goal':
-                        if self.bug_type == 1:
-                            self.exit_on_m_line = False
                         self.entry_points.append(self.get_position())
+                        self.entry_point_indexes.append(self.time_step)
+                        self.mode = 'circ'
                     print('\nCrossed edge')
                     self.lockout = self.lockout_max
                     self.turn_along_edge(edge)
-                    self.mode = 'circ'
 
     def detect_m_line(self):
         if self.mode == 'circ':
@@ -117,30 +114,40 @@ class Bug:
                     self.lockout = self.lockout_max
                     print('\nCrossed M-line')
                     self.m_line_intercepts.append(self.get_position())
-                    if self.exit_on_m_line:
+                    if farthest_point(self.entry_points[-1], self.get_position(), self.goal) == self.entry_points[-1]:
                         self._find_direction_to_turn(self.m_line, m_line=True)
                         self.mode = 'goal'
 
     def turn_along_edge(self, edge):
-        if self.mode == 'circ':
+        if self.mode == 'circ' or self.mode == 'exiting':
             self._find_direction_to_turn(edge)
         else:
             self._rewind_position()
             self.heading = math.atan(-edge['coefficients'][0])
 
-        # print(np.rad2deg(self.heading))
-
-    def detect_entry(self):
-        if self.lockout < -5:
-            if self.mode == 'circ':
+    def detect_entry_exit_point(self):
+        if self.mode == 'circ':
+            if self.lockout < -5:
                 is_complete = self._detect_point(self.entry_points[-1])
                 if is_complete:
                     print('Completed circumnavigation at point: ', self.entry_points[-1])
                     self.lockout = self.lockout_max
-                    self.exit_on_m_line = True
-
-    def move_along_path(self, func):
-        pass
+                    closest_point_goal = [10000000, 10000000]
+                    points_on_poly = self.position_history[self.entry_point_indexes[-1]:]
+                    for point in points_on_poly:
+                        farther = farthest_point(closest_point_goal, point, self.goal)
+                        if farther == closest_point_goal:
+                            closest_point_goal = point
+                    self.exit_point = closest_point_goal
+                    self.mode = 'exiting'
+                    if points_on_poly.index(closest_point_goal) < len(points_on_poly) / 2:
+                        self.heading += math.pi
+        elif self.mode == 'exiting':
+            if self._detect_point(self.exit_point, threshold=0.005):
+                print(f'Exiting at point: {self.exit_point}')
+                self.lockout = self.lockout_max
+                self.turn_to_goal()
+                self.mode = 'goal'
 
     def _detect_point(self, point, threshold=0.01):
         x, y = self.get_position()
