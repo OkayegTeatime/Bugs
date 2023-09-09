@@ -132,7 +132,7 @@ class Bug:
                 if is_complete:
                     print('Completed circumnavigation at point: ', self.entry_points[-1])
                     self.lockout = self.lockout_max
-                    closest_point_goal = [10000000, 10000000]
+                    closest_point_goal = self.start
                     points_on_poly = self.position_history[self.entry_point_indexes[-1]:]
                     for point in points_on_poly:
                         farther = farthest_point(closest_point_goal, point, self.goal)
@@ -140,16 +140,16 @@ class Bug:
                             closest_point_goal = point
                     self.exit_point = closest_point_goal
                     self.mode = 'exiting'
-                    if points_on_poly.index(closest_point_goal) < len(points_on_poly) / 2:
+                    if points_on_poly.index(closest_point_goal) > len(points_on_poly) / 2:
                         self.heading += math.pi
         elif self.mode == 'exiting':
-            if self._detect_point(self.exit_point, threshold=0.005):
+            if self._detect_point(self.exit_point):
                 print(f'Exiting at point: {self.exit_point}')
                 self.lockout = self.lockout_max
                 self.turn_to_goal()
                 self.mode = 'goal'
 
-    def _detect_point(self, point, threshold=0.01):
+    def _detect_point(self, point, threshold=0.003):
         x, y = self.get_position()
         target_x, target_y = point
         distance = math.sqrt((x - target_x) ** 2 + (y - target_y) ** 2)
