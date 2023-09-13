@@ -1,7 +1,7 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import cv2
 from bugs import find_line_equation
+import matplotlib.pyplot as plt
+import numpy as np
+import cv2
 
 image_path = "Bug Problem.jpg"
 img = cv2.imread(image_path)
@@ -15,7 +15,6 @@ def find_contours(image):
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     edged = cv2.Canny(blurred, 50, 150)
     contours, _ = cv2.findContours(edged, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    cv2.drawContours(image, contours, -1, (0, 255, 0), 2)
     filtered_contours = [contour for contour in contours if cv2.contourArea(contour) > 200]
     return filtered_contours
 
@@ -38,26 +37,28 @@ def find_edges(image):
 
 
 if __name__ == "__main__":
-    gray = cv2.cvtColor(IMAGE, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    edged = cv2.Canny(blurred, 50, 150)
+    gray_ = cv2.cvtColor(IMAGE, cv2.COLOR_BGR2GRAY)
+    blurred_ = cv2.GaussianBlur(gray_, (5, 5), 0)
+    edged_ = cv2.Canny(blurred_, 50, 150)
 
     # plt.figure()
     # plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), origin='upper')
     contours_ = find_contours(IMAGE)
+    cv2.drawContours(IMAGE, contours_, -1, (0, 255, 0), 2)
+
     plt.figure()
     plt.subplot(221)
-    plt.imshow(gray, cmap='gray')
+    plt.imshow(gray_, cmap='gray')
     plt.title('Greyscale Image')
     plt.gca().invert_yaxis()
 
     plt.subplot(222)
-    plt.imshow(blurred, cmap='gray')
+    plt.imshow(blurred_, cmap='gray')
     plt.title('Blurred Image')
     plt.gca().invert_yaxis()
 
     plt.subplot(223)
-    plt.imshow(edged, cmap='gray')
+    plt.imshow(edged_, cmap='gray')
     plt.title('Edged Image')
     plt.gca().invert_yaxis()
 

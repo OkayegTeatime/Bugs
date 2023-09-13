@@ -2,6 +2,7 @@ import math
 import time
 from itertools import count
 import matplotlib.pyplot as plt
+from collections import deque
 
 
 def find_line_equation(point1, point2):
@@ -16,8 +17,8 @@ def find_line_equation(point1, point2):
         b = 1
         c = a * x1 + b * y1
     x_limit = [x1, x2]
-    x_limit.sort()
     y_limit = [y1, y2]
+    x_limit.sort()
     y_limit.sort()
     edge = {'coefficients': [a, b, c],
             'limit': {'x': [x_limit[0] - buffer, x_limit[1] + buffer],
@@ -56,6 +57,7 @@ class Bug:
         self.edges = edges
         self.exit_point = None
         self.time_step = 0
+        self.recent_edges = deque(maxlen=2)
 
     def run(self):
         print(f"Bug {self.bug_type} Starting Location:", self.get_position())
@@ -63,7 +65,7 @@ class Bug:
         self.turn_to_goal()
         for _ in range(0, self.steps):
             self.move_forward(self.step_distance)
-            self.detect_edges(self.edges)
+            self.detect_edges()
             if self.bug_type == 1: self.detect_entry_exit_point()
             if self.bug_type == 2: self.detect_m_line()
             if self._detect_point(self.goal, threshold=0.003):
@@ -95,58 +97,52 @@ class Bug:
     def turn_to_goal(self):
         self.heading = math.atan((self.y - self.goal[1]) / (self.x - self.goal[0]))
 
-    def detect_edges(self, edges):
+    def detect_edges(self):
         if self.lockout < 0:
-            for edge in edges:
-                if self._find_collision(edge):
-                    if self.mode == 'goal':
-                        self.entry_points.append(self.get_position())
-                        self.entry_point_indexes.append(self.time_step)
-                        self.mode = 'circ'
-                    print('\nCrossed edge')
-                    self.lockout = self.lockout_max
-                    self.turn_along_edge(edge)
+            for edge in self.edges:
+                if edge not in self.recent_edges:
+                    if self._find_collision(edge):
+                        self.recent_edges.append(edge)
+                        if self.mode == 'goal':
+                            self.entry_points.append(self.get_position())
+                            self.entry_point_indexes.append(self.time_step)
+                            self.mode = 'circ'
+                        print(f'\nCrossed edge at {self.get_position()}')
+                        self.turn_along_edge(edge)
 
     def detect_m_line(self):
-        if self.mode == 'circ':
-            if self.lockout < 0:
-                if self._find_collision(self.m_line):
+        if self.mode == 'circ' and len(self.recent_edges) == 2:
+            if self._find_collision(self.m_line):
+                print('\nCrossed M-line')
+                self.m_line_intercepts.append(self.get_position())
+                if farthest_point(self.entry_points[-1], self.get_position(), self.goal) == self.entry_points[-1]:
+                    self._find_direction_to_turn(self.m_line, m_line=True)
                     self.lockout = self.lockout_max
-                    print('\nCrossed M-line')
-                    self.m_line_intercepts.append(self.get_position())
-                    if farthest_point(self.entry_points[-1], self.get_position(), self.goal) == self.entry_points[-1]:
-                        self._find_direction_to_turn(self.m_line, m_line=True)
-                        self.mode = 'goal'
-
-    def turn_along_edge(self, edge):
-        if self.mode == 'circ' or self.mode == 'exiting':
-            self._find_direction_to_turn(edge)
-        else:
-            self._rewind_position()
-            self.heading = math.atan(-edge['coefficients'][0])
+                    self.recent_edges.clear()
+                    self.mode = 'goal'
 
     def detect_entry_exit_point(self):
-        if self.mode == 'circ':
-            if self.lockout < -5:
-                is_complete = self._detect_point(self.entry_points[-1])
-                if is_complete:
-                    print('Completed circumnavigation at point: ', self.entry_points[-1])
-                    self.lockout = self.lockout_max
-                    closest_point_goal = self.start
-                    points_on_poly = self.position_history[self.entry_point_indexes[-1]:]
-                    for point in points_on_poly:
-                        farther = farthest_point(closest_point_goal, point, self.goal)
-                        if farther == closest_point_goal:
-                            closest_point_goal = point
-                    self.exit_point = closest_point_goal
-                    self.mode = 'exiting'
-                    if points_on_poly.index(closest_point_goal) > len(points_on_poly) / 2:
-                        self.heading += math.pi
+        if self.mode == 'circ' and len(self.recent_edges) == 2:
+            is_complete = self._detect_point(self.entry_points[-1])
+            if is_complete:
+                print('Completed circumnavigation at point: ', self.entry_points[-1])
+                self.recent_edges.popleft()
+                closest_point_goal = self.start
+                points_on_poly = self.position_history[self.entry_point_indexes[-1]:]
+                for point in points_on_poly:
+                    farther = farthest_point(closest_point_goal, point, self.goal)
+                    if farther == closest_point_goal:
+                        closest_point_goal = point
+                self.exit_point = closest_point_goal
+                self.mode = 'exiting'
+                if points_on_poly.index(closest_point_goal) > len(points_on_poly) / 2:
+                    self.heading += math.pi
         elif self.mode == 'exiting':
             if self._detect_point(self.exit_point):
                 print(f'Exiting at point: {self.exit_point}')
-                self.lockout = self.lockout_max
                 self.turn_to_goal()
+                self.lockout = self.lockout_max
+                self.recent_edges.clear()
                 self.mode = 'goal'
 
     def _detect_point(self, point, threshold=0.003):
@@ -156,8 +152,6 @@ class Bug:
         norm = math.sqrt((self.start[0] - self.goal[0]) ** 2 + (self.start[1] - self.goal[1]) ** 2)
         return distance / norm < threshold
 
-    # def go_to_m_line(self):
-
     def _find_collision(self, edge):
         if edge['limit']['x'][0] < self.x < edge['limit']['x'][1] and edge['limit']['y'][0] < self.y < edge['limit']['y'][1]:
             x, y = self.position_history[-2]
@@ -166,12 +160,13 @@ class Bug:
             current_side = edge['coefficients'][0] * x + edge['coefficients'][1] * y < edge['coefficients'][2]
             return previous_side != current_side
 
+    # def go_to_m_line(self):
+
     def _find_direction_to_turn(self, edge, m_line=False):
         if m_line:
             farthest_vertex = self.goal
         else:
             farthest_vertex = farthest_point(edge['points'][0], edge['points'][1], [self.x, self.y])
-        print(farthest_vertex)
         guess_heading = math.atan(-edge['coefficients'][0])
         projected = [self.x + math.cos(guess_heading), self.y + math.sin(guess_heading)]
         farther_point = farthest_point([self.x, self.y], projected, farthest_vertex)
@@ -180,6 +175,13 @@ class Bug:
         else:
             self.heading = guess_heading
         pass
+
+    def turn_along_edge(self, edge):
+        if self.mode == 'circ' or self.mode == 'exiting':
+            self._find_direction_to_turn(edge)
+        else:
+            # self._rewind_position()
+            self.heading = math.atan(-edge['coefficients'][0])
 
     def spiral(self, origin=None):
         if not origin: origin = [0, 0]
